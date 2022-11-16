@@ -1,25 +1,36 @@
 rm(list = ls())
 
-# load libraries
-list.packages = c("sf", "tidyverse", "pROC", "mapview", "terra", "mgcv", "data.table")
-vapply(list.packages, library, logical(1), character.only = TRUE, logical.return = TRUE, quietly = TRUE)
-remove(list.packages)
+# INITIAL SETTINGS --------------------------------------------------------
 
-# load inventories and outline
-outline = sf::st_read("/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/mapping_units/colombia.shp") %>%
-  dplyr::filter(ADM1_ES == "Antioquia") %>% dplyr::select(ADM1_ES)
+# installing packages
+list.packages = c("sf", "tidyverse", "pROC", "mapview", "terra", "mgcv")
+new.packages = list.packages[!(list.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
 
-sf::st_write(basin_1000, "/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/Torrential_Flows/0_Workshop/basin_1000.gpkg")
-sf::st_write(basin_5000, "/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/Torrential_Flows/0_Workshop/basin_5000.gpkg")
-sf::st_write(basin_10000, "/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/Torrential_Flows/0_Workshop/basin_10000.gpkg")
-sf::st_write(basin_25000, "/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/Torrential_Flows/0_Workshop/basin_25000.gpkg")
-sf::st_write(basin_50000, "/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/Torrential_Flows/0_Workshop/basin_50000.gpkg")
-sf::st_write(DESINV, "/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/Torrential_Flows/0_Workshop/desinventar.gpkg")
-sf::st_write(SIMMA_catalog, "/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/Torrential_Flows/0_Workshop/simma_catalog.gpkg")
-sf::st_write(SIMMA_inventory, "/home/mmorenozapata@eurac.edu/OneDrive/COLOMBIA/Torrential_Flows/0_Workshop/simma_inventory.gpkg")
+# loading packages
+lapply(list.packages, require, character.only=T)
+remove(list.packages, new.packages)
 
+# setting up directory
+path = getwd()
+setwd(path)
+remove(path)
 
-# plots
+# LOADING DATA ------------------------------------------------------------
+# load inventories and Antioquia boundary
+SIMMA_catalog = sf::st_read("./data/simma_catalog.gpkg")
+SIMMA_inventory = sf::st_read("./data/simma_inventory.gpkg")
+DESINVENTAR = sf::st_read("./data/desinventar.gpkg")
+antioquia = sf::st_read("./data/antioquia.gpkg")
+
+# load mapping units
+basin_1000 = sf::st_read("./data/basin_1000.gpkg")
+basin_5000 = sf::st_read("./data/basin_5000.gpkg")
+basin_10000 = sf::st_read("./data/basin_10000.gpkg")
+basin_25000 = sf::st_read("./data/basin_25000.gpkg")
+basin_50000 = sf::st_read("./data/basin_50000.gpkg")
+
+# visualize data
 mapview(basin_1000, color = "black", alpha.regions=0) +
   mapview(basin_5000, color = "black", alpha.regions=0) +
   mapview(basin_10000, color = "black", alpha.regions=0) +
@@ -27,8 +38,10 @@ mapview(basin_1000, color = "black", alpha.regions=0) +
   mapview(basin_50000, color = "black", alpha.regions=0) +
   mapview(SIMMA_catalog, col.regions = "blue") +
   mapview(SIMMA_inventory, col.regions = "blue") +
-  mapview(DESINV, col.regions = "red")
+  mapview(DESINVENTAR, col.regions = "red")
 
+
+# EXPLORATORY DATA ANALYSIS -----------------------------------------------
 # histograms and boxplots
 boxplot(basin_5000$slope_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Average slope (°)", xlab="")
 boxplot(basin_5000$melton_index ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Melton index", xlab="")
