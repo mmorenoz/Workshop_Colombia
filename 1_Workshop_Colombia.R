@@ -3,7 +3,7 @@ rm(list = ls())
 # INITIAL SETTINGS --------------------------------------------------------
 
 # installing packages
-list.packages = c("sf", "tidyverse", "pROC", "mapview", "terra", "mgcv")
+list.packages = c("sf", "tidyverse", "pROC", "mapview", "terra", "mgcv", "sperrorest")
 new.packages = list.packages[!(list.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 
@@ -77,34 +77,59 @@ barplot(table(DESINVENTAR$year[DESINVENTAR$municipality=="Medellín"]), col = "f
 
 #### MAPPING UNITS ####
 # histograms and boxplots
-boxplot(basin_1000$slope_u ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average slope (°)", xlab="", ylab="")
-boxplot(basin_1000$melton_index ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Melton index", xlab="", ylab="")
-boxplot(basin_1000$relief ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Relief (m)", xlab="", ylab="")
-boxplot(basin_1000$twi_u ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average TWI", xlab="", ylab="")
-boxplot(basin_1000$granite ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of Granite", xlab="", ylab="")
-boxplot(basin_1000$heterogeneous_agricultural ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of heterogeneous agricultural areas (%)", xlab="", ylab="")
+boxplot(basin_5000$slope_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average slope (°)", xlab="", ylab="")
+boxplot(basin_5000$melton_index ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Melton index", xlab="", ylab="")
+boxplot(basin_5000$relief ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Relief (m)", xlab="", ylab="")
+boxplot(basin_5000$twi_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average TWI", xlab="", ylab="")
+boxplot(basin_5000$granite ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of Granite", xlab="", ylab="")
+boxplot(basin_5000$heterogeneous_agricultural ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of heterogeneous agricultural areas (%)", xlab="", ylab="")
 
 
-# model fit  #
-formula_5000 = bin ~ s(slope_u, bs="tp") +
-  s(area, bs="tp") +
-  s(profile_curv_u) +
-  s(forest_plantation, bs="tp") +
-  s(rainfall_daily_max_u, bs="tp") +
-  s(heterogeneous_agricultural, bs="tp") +
-  s(artificial_land) +
-  s(granite, bs="tp") 
 
-mod_5000 = mgcv::gam(formula_5000, family = binomial, method="REML", data = basin_5000)
-summary(mod_5000)
-gam.check(mod_5000, rep=500)
+# MODELING ----------------------------------------------------------------
+#### model fit #####
+formula_1000 = bin ~
+  s(slope_u) +
+  s(circularity_ratio) +
+  s(rainfall_daily_max_max, k=4) +
+  s(heterogeneous_agricultural) 
+  # s(granite, bs="tp") 
 
-plot(mod_5000, select=6, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_5000)[1], shade=T, shade.col="#74bee8", ylab="")
+mod_1000 = mgcv::gam(formula_1000, family = binomial, method="REML", data = basin_1000)
+summary(mod_1000)
 
-basin_5000$prob = as.numeric(predict(mod_5000, type="response", newdata=basin_5000, newdata.guaranteed=TRUE))
-myroc_5000 = roc(response=basin_5000$bin, predictor=basin_5000$prob, auc=T)
-myroc_5000$auc
-plot(myroc_5000, main = round(myroc_5000$auc, 5))
+plot(mod_1000, select=1, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[1], shade=T, shade.col="#74bee8", ylab="")
+plot(mod_1000, select=2, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[2], shade=T, shade.col="#74bee8", ylab="")
+plot(mod_1000, select=3, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[3], shade=T, shade.col="#74bee8", ylab="")
+plot(mod_1000, select=4, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[4], shade=T, shade.col="#74bee8", ylab="")
+plot(mod_1000, select=5, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[5], shade=T, shade.col="#74bee8", ylab="")
 
-mapview(basin_5000, zcol="prob", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction=-1))
-mapview(basin_5000, zcol="DESINVENTAR")
+plot(mod_1000, pages = 1)
+plot(mod_1000, select=1, residuals=F, rug=T)
+
+basin_1000$prob = as.numeric(predict(mod_1000, type="response", newdata=basin_1000))
+myroc_1000 = roc(response=basin_1000$bin, predictor=basin_1000$prob, auc=T)
+myroc_1000$auc
+plot(myroc_1000, main = round(myroc_1000$auc, 5))
+
+mapview(basin_1000, zcol="prob", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction=-1))
+mapview(basin_1000, zcol="DESINVENTAR")
+
+#### validation #####
+resamp = partition_cv(basin_1000, nfold = 10, repetition = 1, seed1= 1, coords = c("X", "Y")) # example with 3 folds for SUs with landslides
+plot(resamp, SU, coords = c("X", "Y"), cex = 0.01, pch = 19)
+
+centroid = st_centroid(d_rgw)
+centroid = as.data.frame(st_coordinates(centroid))
+d_rgw = as.data.frame(cbind(d_rgw, X=centroid$X, Y=centroid$Y))
+
+# performing non-spatial cross-validation, 10 rep and 10 folds. This step takes a while
+pred_cv = sperrorest(data = SU_whole, formula = Formula_truesum,
+                     model_fun = mgcv::gam,
+                     coords = c("X", "Y"),
+                     model_args = list(family = gaussian),
+                     pred_fun = predict,
+                     progress = 2,
+                     err_fun = my.error,
+                     smp_fun = partition_cv,
+                     smp_args = list(repetition = 1:10, nfold = 10, seed1= 1))
