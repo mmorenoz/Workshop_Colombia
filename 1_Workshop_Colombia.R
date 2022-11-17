@@ -1,25 +1,55 @@
-rm(list = ls())
+#==================================================================================
+# R code for torrential flow susceptibility modeling 
+# Last modified:  November 2022
+#
+# This code is developed for educational purpose, to be used in the course
+# "Developments in landslide inventory, susceptibility, hazard and risk"
+# at the Center for Disaster Resilience at ITC.
+# The code/data is developed by Mateo Moreno.
+# The SIMMA inventory was compiled from Sistema de Información de Movimientos en Masa
+# available at https://simma.sgc.gov.co/#/
+# The Desinventar inventory was compiled from DesInventar Sendai
+# available at https://www.desinventar.net/
+#
+# Do not remove this announcement
+# The code is distributed "as is", WITH NO WARRANTY whatsoever!
+# Code also available at https://github.com/Mateo3195/Workshop_Colombia
+#==================================================================================
+
+
+
 
 # INITIAL SETTINGS --------------------------------------------------------
 
+# the following commands will install and load the necessary packages to run the whole script
+
 # installing packages
-list.packages = c("sf", "tidyverse", "pROC", "mapview", "terra", "mgcv", "sperrorest")
+# this step might take a bit of time and after the installation finishes Rstudio might get restarted
+list.packages = c("sf", "tidyverse", "pROC", "mapview", "mgcv", "sperrorest")
 new.packages = list.packages[!(list.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 
 # loading packages
+# this command will load the previously install packages
 lapply(list.packages, require, character.only=T)
 remove(list.packages, new.packages)
 
 # setting up directory
+# the path correspond to the location in your machine where the data and code are stored
+# keep in mind that the location might need to be entered with the forward slash "/" and not backward slash "\"
 path = getwd()
 setwd(path)
 remove(path)
 
+
+
+
 # LOADING DATA ------------------------------------------------------------
+
+# these commands will load the provided data corresponding to the inventories, catchments and study area
+
 # load inventories and Antioquia boundary
-SIMMA_catalog = sf::st_read("./data/simma_catalog.gpkg")
-SIMMA_inventory = sf::st_read("./data/simma_inventory.gpkg")
+SIMMA = sf::st_read("./data/simma_inventory.gpkg")
 DESINVENTAR = sf::st_read("./data/desinventar.gpkg")
 antioquia = sf::st_read("./data/antioquia.gpkg")
 
@@ -31,33 +61,48 @@ basin_25000 = sf::st_read("./data/basin_25000.gpkg")
 basin_50000 = sf::st_read("./data/basin_50000.gpkg")
 
 # visualize data
+# mapview will allow to visualize the available data in an interactive interface.
+# the basemap can be switched to topographic maps and satellite imagery and
+# the different features can be clicked to explore the attributes
+# let us have a look at some of the torrential flow events
 mapview(basin_1000, color = "black", alpha.regions=0) +
   mapview(basin_5000, color = "black", alpha.regions=0) +
   mapview(basin_10000, color = "black", alpha.regions=0) +
   mapview(basin_25000, color = "black", alpha.regions=0) +
   mapview(basin_50000, color = "black", alpha.regions=0) +
-  mapview(SIMMA_catalog, col.regions = "green") +
-  mapview(SIMMA_inventory, col.regions = "blue") +
+  mapview(SIMMA, col.regions = "blue") +
   mapview(DESINVENTAR, col.regions = "red")
 
 
+
+
 # EXPLORATORY DATA ANALYSIS -----------------------------------------------
+
+# in the following block we will explore the datasets via simple descriptive statistics
+
 ##### SIMMA inventory ####
-SIMMA_inventory = SIMMA_inventory %>%
+# let us explore first the SIMMA inventory
+# this command converts some of our attributes to factor and numeric formats
+SIMMA = SIMMA %>%
   dplyr::mutate(across(type:municipality, factor)) %>%
   dplyr::mutate(across(year:doy, as.numeric))
 
 # histograms and barplots
-# subtype
-summary(SIMMA_inventory$subtype)
-barplot(table(SIMMA_inventory$subtype), main = "Bar chart of subtype", col = "dodgerblue1")
-pie(table(SIMMA_inventory$subtype), main="Pie chart of subtype")
+# let us check a summary of all the available attributes and check some
+# some figures for the subtype of torrential flow in the SIMMA inventory
+summary(SIMMA)
+summary(SIMMA$subtype)
+barplot(table(SIMMA$subtype), main = "Bar chart of subtype", col = "dodgerblue1")
+pie(table(SIMMA$subtype), main = "Pie chart of subtype")
 
+# remember that everytime you want to check the help options for a specific function
+# you can do ?"nameofthefunction" in the command line  e.g., ?barplot
+# now let us explore a bit the dates in the SIMMA inventory
 # dates
-table(SIMMA_inventory$month)
-barplot(table(SIMMA_inventory$month), main = "Bar chart of month", col = "dodgerblue1")
-table(SIMMA_inventory$year)
-barplot(table(SIMMA_inventory$year), main = "Bar chart of year", col = "dodgerblue1")
+table(SIMMA$month)
+barplot(table(SIMMA$month), main = "Bar chart of month", col = "dodgerblue1")
+table(SIMMA$year)
+barplot(table(SIMMA$year), main = "Bar chart of year", col = "dodgerblue1")
 
 #### DESINVENTAR inventory ####
 DESINVENTAR = DESINVENTAR %>%
@@ -66,17 +111,24 @@ DESINVENTAR = DESINVENTAR %>%
   dplyr::mutate(across(people_dead:people_missing, as.numeric))
 
 # histograms and barplots
+# let us check the same attributes for the DESINVENTAR inventory
+summary(DESINVENTAR)
 table(DESINVENTAR$month)
 barplot(table(DESINVENTAR$month), main = "Bar chart of month", col = "firebrick1")
-
 table(DESINVENTAR$year)
-barplot(table(DESINVENTAR$month), main = "Bar chart of year", col = "firebrick1")
+barplot(table(DESINVENTAR$year), main = "Bar chart of year", col = "firebrick1")
+table(DESINVENTAR$cause)
+barplot(table(DESINVENTAR$cause), main = "Bar chart of year", col = "firebrick1")
 
+# we can also filtered the graphs according to other attributes e.g., a specific municipality
 # for specific municipalities
 barplot(table(DESINVENTAR$year[DESINVENTAR$municipality=="Medellín"]), col = "firebrick1")
 
+
 #### MAPPING UNITS ####
+# now let us see some of the available attributes in our mapping units
 # histograms and boxplots
+hist(basin_5000$slope_u, breaks = 100, xlab="", ylab="Frequency", main = "Average slope (°)")
 boxplot(basin_5000$slope_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average slope (°)", xlab="", ylab="")
 boxplot(basin_5000$melton_index ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Melton index", xlab="", ylab="")
 boxplot(basin_5000$relief ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Relief (m)", xlab="", ylab="")
@@ -84,52 +136,106 @@ boxplot(basin_5000$twi_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"),
 boxplot(basin_5000$granite ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of Granite", xlab="", ylab="")
 boxplot(basin_5000$heterogeneous_agricultural ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of heterogeneous agricultural areas (%)", xlab="", ylab="")
 
+# we can also check patterns using the Probability Density function for both stable and unstable catchments
+plot(density(basin_5000$slope_u[basin_5000$bin==0]), col = "blue", "Average slope (°)")
+lines(density(basin_5000$slope_u[basin_5000$bin==1]), col = "red")
+
+# let us recall all these are statistical descriptors, not a model as such, and therefore we cannot use them
+# to make our predictions.
+
+
 
 
 # MODELING ----------------------------------------------------------------
+# In the following block, we will jump into the statistical modeling using 
+# Generalized Additive Modes (GAMs) in the package mgcv https://cran.r-project.org/web/packages/mgcv/index.html
+
+# before we start let us have a look at the total of events in each inventory
+nrow(SIMMA)
+nrow(DESINVENTAR)
+nrow(SIMMA) + nrow(DESINVENTAR)
+
+# once we aggregate the inventories in the catchments our number might differ since we can have
+# multiple torrential flows in the very same catchment e.g.,
+table(basin_5000$SIMMA)
+table(basin_5000$DESINVENTAR)
+table(basin_5000$bin)
+
 #### model fit #####
-formula_1000 = bin ~
-  s(slope_u) +
-  s(circularity_ratio) +
-  s(rainfall_daily_max_max, k=4) +
-  s(heterogeneous_agricultural) 
-  # s(granite, bs="tp") 
+# formula
+# here we will declare the formula that we will pass to mgcv
+# literature, knowledge of the study area and the exploratory data analysis may give us ideas of the 
+# explanatory variables that we want to input in our model
+# bs controls the smooth types to be use in the model and "tp" is used by default.
+# k-1 or (k) sets the upper limit on the degrees of freedom associated with a smooth. 
+# for more details go to https://cran.r-project.org/web/packages/mgcv/mgcv.pdf
 
-mod_1000 = mgcv::gam(formula_1000, family = binomial, method="REML", data = basin_1000)
-summary(mod_1000)
+formula_5000 = bin ~
+  s(slope_u, bs="tp", k=4) +
+  elongation_ratio +
+  rainfall_daily_max_u
+  # granite +
+  # s(heterogeneous_agricultural, k=3) +
+  # s(relief_ratio) +
+  
+  
 
-plot(mod_1000, select=1, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[1], shade=T, shade.col="#74bee8", ylab="")
-plot(mod_1000, select=2, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[2], shade=T, shade.col="#74bee8", ylab="")
-plot(mod_1000, select=3, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[3], shade=T, shade.col="#74bee8", ylab="")
-plot(mod_1000, select=4, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[4], shade=T, shade.col="#74bee8", ylab="")
-plot(mod_1000, select=5, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[5], shade=T, shade.col="#74bee8", ylab="")
+# fit
+mod_5000 = mgcv::gam(formula_5000, family = binomial, method="REML", data = basin_50001)
+gam.check(mod_5000)
+summary(mod_5000)
 
-plot(mod_1000, pages = 1)
-plot(mod_1000, select=1, residuals=F, rug=T)
+# partial effects
+plot(mod_5000, select=1, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[1], shade=T, ylab="")
+plot(mod_5000, select=2, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[2], shade=T, ylab="")
+plot(mod_5000, select=3, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[3], shade=T, ylab="")
+plot(mod_5000, select=4, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[4], shade=T, ylab="")
+plot(mod_5000, select=5, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[5], shade=T, ylab="")
+plot(mod_5000, select=6, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[6], shade=T, ylab="")
 
-basin_1000$prob = as.numeric(predict(mod_1000, type="response", newdata=basin_1000))
-myroc_1000 = roc(response=basin_1000$bin, predictor=basin_1000$prob, auc=T)
-myroc_1000$auc
-plot(myroc_1000, main = round(myroc_1000$auc, 5))
+plot(mod_5000, pages = 1)
+plot(mod_5000, select=1, residuals=F, rug=T)
 
-mapview(basin_1000, zcol="prob", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction=-1))
-mapview(basin_1000, zcol="DESINVENTAR")
+# fitting performance
+basin_50001$probability = as.numeric(predict(mod_5000, type="response", newdata=basin_50001))
+myroc_5000 = roc(response=basin_50001$bin, predictor=basin_50001$probability, auc=T)
+plot(myroc_5000, main = round(myroc_5000$auc, 5))
+
 
 #### validation #####
-resamp = partition_cv(basin_1000, nfold = 10, repetition = 1, seed1= 1, coords = c("X", "Y")) # example with 3 folds for SUs with landslides
-plot(resamp, SU, coords = c("X", "Y"), cex = 0.01, pch = 19)
+# 10-fold cross-validation
+# partitions
+centroids = dplyr::select(basin_1000, x, y) %>% sf::st_drop_geometry()
+partition = partition_cv(basin_1000, nfold = 10, repetition = 1, seed1= 1, coords = c("x", "y")) 
+plot(partition, centroids, coords = c("x", "y"), cex = 0.01, pch = 19)
 
-centroid = st_centroid(d_rgw)
-centroid = as.data.frame(st_coordinates(centroid))
-d_rgw = as.data.frame(cbind(d_rgw, X=centroid$X, Y=centroid$Y))
 
-# performing non-spatial cross-validation, 10 rep and 10 folds. This step takes a while
-pred_cv = sperrorest(data = SU_whole, formula = Formula_truesum,
-                     model_fun = mgcv::gam,
-                     coords = c("X", "Y"),
-                     model_args = list(family = gaussian),
-                     pred_fun = predict,
-                     progress = 2,
-                     err_fun = my.error,
-                     smp_fun = partition_cv,
-                     smp_args = list(repetition = 1:10, nfold = 10, seed1= 1))
+# settings for the lop
+fold = (1:10)
+basin_1000_pred = as.data.frame(matrix(NA,ncol=1, nrow=nrow(basin_1000)))
+names(basin_1000_pred) = "prediction"
+basin_1000_myroc = c(NA)
+df = basin_1000
+
+# loop
+for (i in fold){
+  id.holdout = partition[[1]][[i]]$test
+  df_train = df[-id.holdout,]
+  df_test = df[id.holdout, ]
+  fit = mgcv::gam(formula_1000, data=df_train, family=binomial, method="REML")
+  basin_1000_pred$prediction[id.holdout] = predict(fit, type="response", newdata.guaranteed=TRUE, newdata=df_test)
+  roc = roc(response=df_test$bin, predictor=basin_1000_pred$pred[id.holdout], auc=T)
+  basin_1000_myroc[i] = as.numeric(unlist(roc[9]))
+}
+
+# plot
+par(pty="s")
+boxplot(basin_1000_myroc)
+mean(basin_1000_myroc)
+median(basin_1000_myroc)
+
+
+# VISUALIZATION -----------------------------------------------------------
+mapview(basin_50001, zcol="probability", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction=-1))
+mapview(basin_50001, zcol="rainfall_daily_max_u", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction=-1))
+mapview(basin_1000, zcol="DESINVENTAR")
