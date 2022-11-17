@@ -36,12 +36,46 @@ mapview(basin_1000, color = "black", alpha.regions=0) +
   mapview(basin_10000, color = "black", alpha.regions=0) +
   mapview(basin_25000, color = "black", alpha.regions=0) +
   mapview(basin_50000, color = "black", alpha.regions=0) +
-  mapview(SIMMA_catalog, col.regions = "blue") +
+  mapview(SIMMA_catalog, col.regions = "green") +
   mapview(SIMMA_inventory, col.regions = "blue") +
   mapview(DESINVENTAR, col.regions = "red")
 
 
 # EXPLORATORY DATA ANALYSIS -----------------------------------------------
+##### SIMMA inventory ####
+SIMMA_inventory = SIMMA_inventory %>%
+  dplyr::mutate(across(type:municipality, factor)) %>%
+  dplyr::mutate(across(year:doy, as.numeric))
+
+# histograms and barplots
+# subtype
+summary(SIMMA_inventory$subtype)
+barplot(table(SIMMA_inventory$subtype), main = "Bar chart of subtype", col = "dodgerblue1")
+pie(table(SIMMA_inventory$subtype), main="Pie chart of subtype")
+
+# dates
+table(SIMMA_inventory$month)
+barplot(table(SIMMA_inventory$month), main = "Bar chart of month", col = "dodgerblue1")
+table(SIMMA_inventory$year)
+barplot(table(SIMMA_inventory$year), main = "Bar chart of year", col = "dodgerblue1")
+
+#### DESINVENTAR inventory ####
+DESINVENTAR = DESINVENTAR %>%
+  dplyr::mutate(across(cause:municipality, factor)) %>%
+  dplyr::mutate(across(year:doy, as.numeric)) %>%
+  dplyr::mutate(across(people_dead:people_missing, as.numeric))
+
+# histograms and barplots
+table(DESINVENTAR$month)
+barplot(table(DESINVENTAR$month), main = "Bar chart of month", col = "firebrick1")
+
+table(DESINVENTAR$year)
+barplot(table(DESINVENTAR$month), main = "Bar chart of year", col = "firebrick1")
+
+# for specific municipalities
+barplot(table(DESINVENTAR$year[DESINVENTAR$municipality=="Medellín"]), col = "firebrick1")
+
+#### MAPPING UNITS ####
 # histograms and boxplots
 boxplot(basin_5000$slope_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Average slope (°)", xlab="")
 boxplot(basin_5000$melton_index ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Melton index", xlab="")
