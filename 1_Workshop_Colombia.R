@@ -77,13 +77,12 @@ barplot(table(DESINVENTAR$year[DESINVENTAR$municipality=="Medellín"]), col = "f
 
 #### MAPPING UNITS ####
 # histograms and boxplots
-boxplot(basin_5000$slope_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Average slope (°)", xlab="")
-boxplot(basin_5000$melton_index ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Melton index", xlab="")
-boxplot(basin_5000$relief ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Relief (m)", xlab="")
-boxplot(basin_5000$twi_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Average TWI", xlab="")
-boxplot(basin_5000$granite ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Proportion of Granite", xlab="")
-boxplot(basin_5000$heterogeneous_agricultural ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Proportion of heterogeneous agricultural areas (%)", xlab="")
-boxplot(basin_5000$rainfall_daily_max_max~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), ylab = "Maximum daily rainfall (mm)", xlab="")
+boxplot(basin_1000$slope_u ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average slope (°)", xlab="", ylab="")
+boxplot(basin_1000$melton_index ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Melton index", xlab="", ylab="")
+boxplot(basin_1000$relief ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Relief (m)", xlab="", ylab="")
+boxplot(basin_1000$twi_u ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average TWI", xlab="", ylab="")
+boxplot(basin_1000$granite ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of Granite", xlab="", ylab="")
+boxplot(basin_1000$heterogeneous_agricultural ~ basin_1000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of heterogeneous agricultural areas (%)", xlab="", ylab="")
 
 
 # model fit  #
