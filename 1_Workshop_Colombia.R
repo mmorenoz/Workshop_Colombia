@@ -25,7 +25,7 @@
 
 # installing packages
 # this step might take a bit of time and after the installation finishes Rstudio might get restarted
-list.packages = c("sf", "tidyverse", "pROC", "mapview", "mgcv", "sperrorest")
+list.packages = c("sf", "tidyverse", "pROC", "mapview", "mgcv", "sperrorest", "paletteer")
 new.packages = list.packages[!(list.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 
@@ -54,27 +54,19 @@ DESINVENTAR = sf::st_read("./data/desinventar.gpkg")
 antioquia = sf::st_read("./data/antioquia.gpkg")
 
 # load mapping units
-basin_1000 = sf::st_read("./data/basin_1000.gpkg")
 basin_5000 = sf::st_read("./data/basin_5000.gpkg")
-basin_10000 = sf::st_read("./data/basin_10000.gpkg")
-basin_25000 = sf::st_read("./data/basin_25000.gpkg")
-basin_50000 = sf::st_read("./data/basin_50000.gpkg")
 
 # visualize data
 # mapview will allow to visualize the available data in an interactive interface.
 # the basemap can be switched to topographic maps and satellite imagery and
 # the different features can be clicked to explore the attributes
 # let us have a look at some of the torrential flow events
-mapview(basin_1000, color = "black", alpha.regions=0) +
+
+mapview(SIMMA, col.regions = "blue") +
+  mapview(DESINVENTAR, col.regions = "red") +
   mapview(basin_5000, color = "black", alpha.regions=0) +
-  mapview(basin_10000, color = "black", alpha.regions=0) +
-  mapview(basin_25000, color = "black", alpha.regions=0) +
-  mapview(basin_50000, color = "black", alpha.regions=0) +
-  mapview(SIMMA, col.regions = "blue") +
-  mapview(DESINVENTAR, col.regions = "red")
-
-
-
+  mapview(antioquia, color = "magenta", alpha.regions=0, lwd=2)
+  
 
 # EXPLORATORY DATA ANALYSIS -----------------------------------------------
 
@@ -122,23 +114,38 @@ barplot(table(DESINVENTAR$cause), main = "Bar chart of year", col = "firebrick1"
 
 # we can also filtered the graphs according to other attributes e.g., a specific municipality
 # for specific municipalities
-barplot(table(DESINVENTAR$year[DESINVENTAR$municipality=="Medellín"]), col = "firebrick1")
+barplot(table(DESINVENTAR$year[DESINVENTAR$municipality =="Medellín"]), col = "firebrick1")
 
 
 #### MAPPING UNITS ####
 # now let us see some of the available attributes in our mapping units
+# continuous properties were aggregated using the mean (u) and standard deviation (g) (e.g., slope, twi)
+# discrete properties were aggregated using the proportion of each class inside the mapping unit (e.g., lithology)
+
+# let us visualize the explanatory variables
+# first the inventories
+mapview(basin_5000, zcol="bin", col.regions=c("dodgerblue1", "firebrick1")) +
+  mapview(basin_5000, zcol="DESINVENTAR", col.regions=c("dodgerblue1", "firebrick1")) +
+  mapview(basin_5000, zcol="SIMMA", col.regions=c("dodgerblue1", "firebrick1"))
+
+# then the explanatory variables
+mapview(basin_5000, zcol="slope_u", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction = -1)) +
+mapview(basin_5000, zcol="melton_index", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlBu", direction = -1), at=seq(0, 0.5, 0.05)) +
+mapview(basin_5000, zcol="permanent_crop", col.regions=paletteer::paletteer_d("RColorBrewer::OrRd", direction = 1), at=seq(0, 30, 1)) +
+mapview(basin_5000, zcol="granite", col.regions=paletteer::paletteer_d("RColorBrewer::PuRd", direction = 1))
+
 # histograms and boxplots
 hist(basin_5000$slope_u, breaks = 100, xlab="", ylab="Frequency", main = "Average slope (°)")
 boxplot(basin_5000$slope_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average slope (°)", xlab="", ylab="")
 boxplot(basin_5000$melton_index ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Melton index", xlab="", ylab="")
 boxplot(basin_5000$relief ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Relief (m)", xlab="", ylab="")
-boxplot(basin_5000$twi_u ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Average TWI", xlab="", ylab="")
+boxplot(basin_5000$circularity_ratio ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Elongation ratio", xlab="", ylab="")
 boxplot(basin_5000$granite ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of Granite", xlab="", ylab="")
 boxplot(basin_5000$heterogeneous_agricultural ~ basin_5000$bin, col = c("dodgerblue1", "firebrick1"), main = "Proportion of heterogeneous agricultural areas (%)", xlab="", ylab="")
 
 # we can also check patterns using the Probability Density function for both stable and unstable catchments
-plot(density(basin_5000$slope_u[basin_5000$bin==0]), col = "blue", "Average slope (°)")
-lines(density(basin_5000$slope_u[basin_5000$bin==1]), col = "red")
+plot(density(basin_5000$slope_u[basin_5000$bin==0]), col = "blue", "Average slope (°)", lwd = 2)
+lines(density(basin_5000$slope_u[basin_5000$bin==1]), col = "red", lwd = 2)
 
 # let us recall all these are statistical descriptors, not a model as such, and therefore we cannot use them
 # to make our predictions.
@@ -171,71 +178,61 @@ table(basin_5000$bin)
 # for more details go to https://cran.r-project.org/web/packages/mgcv/mgcv.pdf
 
 formula_5000 = bin ~
-  s(slope_u, bs="tp", k=4) +
+  s(slope_u, bs="tp", k = 5) +
+  s(relief, k = 9)+
   elongation_ratio +
-  rainfall_daily_max_u
-  # granite +
-  # s(heterogeneous_agricultural, k=3) +
-  # s(relief_ratio) +
-  
-  
+  granite +
+  pasture
+
 
 # fit
-mod_5000 = mgcv::gam(formula_5000, family = binomial, method="REML", data = basin_50001)
-gam.check(mod_5000)
+mod_5000 = mgcv::gam(formula_5000, family = binomial, method="REML", data = basin_5000)
 summary(mod_5000)
+gam.check(mod_5000)
 
 # partial effects
-plot(mod_5000, select=1, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[1], shade=T, ylab="")
-plot(mod_5000, select=2, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[2], shade=T, ylab="")
-plot(mod_5000, select=3, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[3], shade=T, ylab="")
-plot(mod_5000, select=4, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[4], shade=T, ylab="")
-plot(mod_5000, select=5, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[5], shade=T, ylab="")
-plot(mod_5000, select=6, residuals=F, rug=T, all.terms=T, trans=plogis, scale=-1, seWithMean=T, shift=coef(mod_1000)[6], shade=T, ylab="")
-
-plot(mod_5000, pages = 1)
-plot(mod_5000, select=1, residuals=F, rug=T)
+# plot(mod_5000, select=1, trans=plogis, shift=coef(mod_5000)[1], shade=T, ylab="")
+plot(mod_5000, select=1, trans=plogis, shade=T, ylab="")
+plot(mod_5000, trans=plogis, pages=1, all.terms=T, shade=T, ylab="")
+plot(mod_5000, select=3, scale=0)
 
 # fitting performance
-basin_50001$probability = as.numeric(predict(mod_5000, type="response", newdata=basin_50001))
-myroc_5000 = roc(response=basin_50001$bin, predictor=basin_50001$probability, auc=T)
+basin_5000$probability = as.numeric(predict(mod_5000, type="response", newdata=basin_5000))
+myroc_5000 = roc(response=basin_5000$bin, predictor=basin_5000$probability, auc=T)
 plot(myroc_5000, main = round(myroc_5000$auc, 5))
 
 
 #### validation #####
 # 10-fold cross-validation
 # partitions
-centroids = dplyr::select(basin_1000, x, y) %>% sf::st_drop_geometry()
-partition = partition_cv(basin_1000, nfold = 10, repetition = 1, seed1= 1, coords = c("x", "y")) 
+centroids = dplyr::select(basin_5000, x, y) %>% sf::st_drop_geometry()
+partition = partition_cv(basin_5000, nfold = 10, repetition = 1, seed1 = 123) 
 plot(partition, centroids, coords = c("x", "y"), cex = 0.01, pch = 19)
-
 
 # settings for the lop
 fold = (1:10)
-basin_1000_pred = as.data.frame(matrix(NA,ncol=1, nrow=nrow(basin_1000)))
-names(basin_1000_pred) = "prediction"
-basin_1000_myroc = c(NA)
-df = basin_1000
+basin_5000$prediction = NA
+basin_5000_myroc = c(NA)
+df = basin_5000
 
 # loop
 for (i in fold){
   id.holdout = partition[[1]][[i]]$test
-  df_train = df[-id.holdout,]
-  df_test = df[id.holdout, ]
-  fit = mgcv::gam(formula_1000, data=df_train, family=binomial, method="REML")
-  basin_1000_pred$prediction[id.holdout] = predict(fit, type="response", newdata.guaranteed=TRUE, newdata=df_test)
-  roc = roc(response=df_test$bin, predictor=basin_1000_pred$pred[id.holdout], auc=T)
-  basin_1000_myroc[i] = as.numeric(unlist(roc[9]))
+  df_train = basin_5000[-id.holdout,]
+  df_test = basin_5000[id.holdout, ]
+  fit = mgcv::gam(formula_5000, data=df_train, family=binomial, method="REML")
+  basin_5000$prediction[id.holdout] = as.numeric(predict(fit, type="response", newdata=df_test))
+  roc = roc(response=df_test$bin, predictor=basin_5000$prediction[id.holdout], auc=T)
+  basin_5000_myroc[i] = as.numeric(unlist(roc[9]))
 }
 
 # plot
-par(pty="s")
-boxplot(basin_1000_myroc)
-mean(basin_1000_myroc)
-median(basin_1000_myroc)
-
+boxplot(basin_5000_myroc)
+round(basin_5000_myroc,5)
+mean(basin_5000_myroc)
+median(basin_5000_myroc)
+plot(roc)
 
 # VISUALIZATION -----------------------------------------------------------
-mapview(basin_50001, zcol="probability", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction=-1))
-mapview(basin_50001, zcol="rainfall_daily_max_u", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction=-1))
-mapview(basin_1000, zcol="DESINVENTAR")
+mapview(basin_5000, zcol="probability", col.regions=paletteer::paletteer_d("RColorBrewer::RdYlGn", direction=-1))+
+mapview(basin_5000, zcol="bin")
